@@ -60,13 +60,11 @@ def create_neural_net(topology, act_f, act_f_derivate):
 
 
 def sigmoide(x): return 1 / (1+numpy.e ** (-x))
+def sigmoide_derivate(x): return x * (1-x)
 
 
 def error_cost(Yp, Yr): return numpy.mean((Yp-Yr)**2)
 def error_cost_derivate(Yp, Yr): return Yp-Yr
-
-
-def sigmoide_derivate(x): return x * (1-x)
 
 
 def train(nn, lr=0.5, train: bool = True):
@@ -83,7 +81,7 @@ def train(nn, lr=0.5, train: bool = True):
 
         data.append((z, a))
 
-    columns = ['Z', 'Activation']
+    columns = ['Sum', 'Activation']
     save_csv(filename='train_fordwardpass.csv', columns=columns, data=data)
 
     if train:
@@ -92,19 +90,19 @@ def train(nn, lr=0.5, train: bool = True):
 
         deltas = []
 
-        # for l in reversed(range(0, len(nn))):
-        #     z = out[l+1][0]
-        #     a = out[l+1][1]
+        for l in reversed(range(0, len(nn))):
+            z = out[l+1][0]
+            a = out[l+1][1]
 
-        #     # Cálculo de delta en función a la última capa
-        #     if l == len(nn)-1:
-        #         deltas.insert(0, error_cost_derivate(
-        #             a, Y) * nn[l].act_f_derivate(a))
+            # Cálculo de delta en función a la última capa
+            if l == len(nn)-1:
+                deltas.insert(0, error_cost_derivate(
+                    a, Y) * nn[l].act_f_derivate(a))
 
-        #     else:
-        #         # Cálculo de delta en función de capas previas
-        #         deltas.insert(0, deltas[0] @ nn[l].w.T *
-        #                       nn[l].act_f_derivate(a))
+            else:
+                # Cálculo de delta en función de capas previas
+                deltas.insert(0, deltas[0] @ nn[l].w.T *
+                              nn[l].act_f_derivate(a))
 
 
 if __name__ == '__main__':
@@ -116,4 +114,4 @@ if __name__ == '__main__':
     topology = [2, 4, 8, 1]
     nn = create_neural_net(topology, sigmoide, sigmoide_derivate)
 
-    # train(nn=nn)
+    train(nn=nn)
