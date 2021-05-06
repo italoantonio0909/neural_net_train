@@ -1,9 +1,13 @@
+import time
+
+import numpy
+import scipy
+from IPython.display import clear_output
+from matplotlib import pyplot as plt
 from sklearn.datasets import make_circles
 import argparse
-import numpy
-from matplotlib import pyplot as plt
-import pandas
 import os
+import pandas
 
 
 def cli():
@@ -67,7 +71,7 @@ def error_cost(Yp, Yr): return numpy.mean((Yp-Yr)**2)
 def error_cost_derivate(Yp, Yr): return Yp-Yr
 
 
-def train(nn, lr=0.5, train: bool = True):
+def train(*, nn, lr=0.05, X, Y, train: bool = True, l2_cost, l2_cost_derivate):
     # Ir hacia adelante
     # Realizar sumas ponderadas y funciones de activación
     out = [(None, X)]
@@ -81,8 +85,8 @@ def train(nn, lr=0.5, train: bool = True):
 
         data.append((z, a))
 
-    columns = ['Sum', 'Activation']
-    save_csv(filename='train_fordwardpass.csv', columns=columns, data=data)
+    # columns = ['Sum', 'Activation']
+    # save_csv(filename='train_fordwardpass.csv', columns=columns, data=data)
 
     if train:
         # Ir hacia atras y calcular deltas
@@ -94,15 +98,72 @@ def train(nn, lr=0.5, train: bool = True):
             z = out[l+1][0]
             a = out[l+1][1]
 
-            # Cálculo de delta en función a la última capa
             if l == len(nn)-1:
-                deltas.insert(0, error_cost_derivate(
+                # Cálculo de delta en función a la última capa
+                deltas.insert(0, l2_cost_derivate(
                     a, Y) * nn[l].act_f_derivate(a))
 
             else:
                 # Cálculo de delta en función de capas previas
-                deltas.insert(0, deltas[0] @ nn[l].w.T *
+                deltas.insert(0, deltas[0] @ _w.T *
                               nn[l].act_f_derivate(a))
+
+            # Primer iteración
+            # Iteración number 2 _w vale
+            # [[-0.88814489]
+            #  [ 0.28757434]
+            #  [ 0.19901192]
+            #  [-0.61129388]
+            #  [ 0.1513037 ]
+            #  [-0.74521616]
+            #  [-0.31054925]
+            #  [ 0.0257846 ]]
+
+            _w = nn[l].w
+
+            # Descenso del gradiente
+            # Mejora del parámetro de BAIAS
+            nn[l].b = nn[l].b - \
+                numpy.mean(deltas[0], axis=0, keepdims=True) * lr
+            # Mejora del parámetro de Pesos
+            nn[l].w = nn[l].w - out[l][1].T @ deltas[0] * lr
+
+    return out[-1][1]
+
+
+def deep_train(*, nn, l2_cost, l2_cost_derivate, X, Y):
+    # Entrenamiento profundo de la red neuronal
+    loss = []
+    for i in range(1000):
+        pY = train(nn=nn, X=X, Y=Y, l2_cost=error_cost,
+                   l2_cost_derivate=error_cost_derivate)
+
+        if i % 25 == 0:
+            loss.append(l2_cost(pY, Y))
+
+            res = 50
+
+            _x0 = numpy.linspace(-1.5, 1.5, res)
+            _x1 = numpy.linspace(-1.5, 1.5, res)
+
+            _y = numpy.zeros((res, res))
+
+            for i0, x0 in enumerate(_x0):
+                for i1, x1 in enumerate(_x1):
+                    _y[i0, i1] = train(nn=nn, X=numpy.array(
+                        [[x0, x1]]), Y=Y, l2_cost=l2_cost, l2_cost_derivate=l2_cost_derivate, train=False)[0][0]
+
+            plt.pcolormesh(_x0, _x1, _y, cmap='coolwarm')
+            plt.axis('equal')
+
+            plt.scatter(X[Y[:, 0] == 0, 0], X[Y[:, 0] == 0, 1], c='skyblue')
+            plt.scatter(X[Y[:, 0] == 1, 0], X[Y[:, 0] == 1, 1], c='salmon')
+
+            clear_output(wait=True)
+            plt.show()
+            plt.plot(range(len(loss)), loss)
+            plt.show()
+            time.sleep(0.5)
 
 
 if __name__ == '__main__':
@@ -110,8 +171,10 @@ if __name__ == '__main__':
     samples = int(args.samples)
 
     X, Y = make_circles(n_samples=samples, factor=0.5, noise=0.05)
+    Y = Y[:, numpy.newaxis]
 
     topology = [2, 4, 8, 1]
     nn = create_neural_net(topology, sigmoide, sigmoide_derivate)
 
-    train(nn=nn)
+    deep_train(nn=nn, l2_cost=error_cost,
+               l2_cost_derivate=error_cost_derivate, X=X, Y=Y)
